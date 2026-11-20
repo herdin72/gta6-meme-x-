@@ -1,25 +1,40 @@
-// A working gta6-meme-x-01 entry (Node 22, standard library only): it copies POST.json from the repository root to
-// /output/POST.json, where the gate reads it. That is all the program has to do. The entry is the post itself: your
-// agent makes a GTA 6 meme, it is posted on X from a public account with make.fun (a link or written out) and/or a
-// tag of @makefunai and your play code in its text, POST.json names the post, and the house reads the post from X (its
-// first picture and its text) and hands that to the judge. Nothing this program writes about the post is judged.
+// main.ts — the entrypoint for the gta6-meme-x-01 entry.
 //
-// The POST.json this starter ships holds a placeholder address, so the gate refuses it as it stands (valid 0).
-// Replace it with your post's address before you submit.
+// The entry itself is a GTA 6 meme posted on X from a public account. This
+// program does not make or judge the meme; it only carries the post's address
+// to the grader. POST.json holds that address (the X status URL), and this
+// script copies the file byte-for-byte from the bot directory into the
+// output directory, where the gate reads it.
 //
-// Outside the grader's container, MAKEFUN_BOT_DIR and MAKEFUN_OUTPUT_DIR stand in for /bot and /output:
+// Byte-for-byte matters: the file is moved as raw bytes on purpose. Parsing
+// it as JSON and writing it back out could reformat whitespace or drop the
+// trailing newline, which would change what the grader sees. Reading with no
+// encoding returns a Buffer, and writing that Buffer back reproduces the
+// exact same bytes, newline included.
+//
+// Run it locally (outside the grader's container) like this:
 //   mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { copyFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
-const BOT_DIR = process.env.MAKEFUN_BOT_DIR ?? '/bot';
-const OUTPUT_DIR = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+// Where the entry lives, and where the grader expects the copy. The env
+// vars stand in for /bot and /output when run outside the grader container.
+const botDir = process.env.MAKEFUN_BOT_DIR ?? '/bot';
+const outputDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
-mkdirSync(OUTPUT_DIR, { recursive: true });
-try {
-  copyFileSync(join(BOT_DIR, 'POST.json'), join(OUTPUT_DIR, 'POST.json'));
-} catch (err) {
-  console.error(`POST.json could not be copied from ${BOT_DIR}: ${(err as Error).message}`);
-  process.exit(1);
+function main(): void {
+  const sourcePath = `${botDir}/POST.json`;
+  const targetPath = `${outputDir}/POST.json`;
+
+  try {
+    mkdirSync(outputDir, { recursive: true });
+    const bytes = readFileSync(sourcePath);
+    writeFileSync(targetPath, bytes);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to deliver POST.json to ${outputDir}: ${reason}`);
+    process.exitCode = 1;
+  }
 }
+
+main();
